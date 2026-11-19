@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HandwerkFlow">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>HandwerkFlow</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#3f4a3c">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: dunkle Kopfzeile, Statusfilter, Kartenliste. Ab 1000px fünf Spalten wie in der Mindmap. */
+:root{
+  --bg:#fff8f0; --board:#ffe9e6; --surface:#ffffff; --ink:#2b3228; --muted:#667161; --line:#e4d9cb;
+  --dark:#3f4a3c; --on-dark:#fff8f0; --pri:#3f4a3c; --sage:#8fa87d; --sage-ink:#25301f;
+  --warn-bg:#f9c9c4; --warn-ink:#6a1f18; --ok-bg:#dcebd4; --ok-ink:#2d4a25;
+  --paper:#ffffff; --paper-ink:#161a14; --paper-line:#cfcfcf;
+  --font:'Montserrat',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#161a15; --board:#1d241c; --surface:#242c22; --ink:#eef1ea; --muted:#9aa595; --line:#35412f;
+  --dark:#2b352a; --on-dark:#f3efe6; --pri:#587a4d; --sage:#8fa87d; --sage-ink:#1a2118;
+  --warn-bg:#5b2a25; --warn-ink:#ffd9d4; --ok-bg:#2c4227; --ok-ink:#cfe6c6; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#161a15; --board:#1d241c; --surface:#242c22; --ink:#eef1ea; --muted:#9aa595; --line:#35412f;
+  --dark:#2b352a; --on-dark:#f3efe6; --pri:#587a4d; --sage:#8fa87d; --sage-ink:#1a2118;
+  --warn-bg:#5b2a25; --warn-ink:#ffd9d4; --ok-bg:#2c4227; --ok-ink:#cfe6c6; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.45;
+  padding-block:0 76px;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* Kopfzeile */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--dark)}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:25;background:var(--dark);color:var(--on-dark);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:10px}
+.top h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.01em}
+.btn{border:0;border-radius:8px;padding:9px 14px;background:var(--sage);color:var(--sage-ink);font-weight:600}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn.warn{background:var(--warn-bg);color:var(--warn-ink)}
+.btn.sm{padding:6px 10px;font-size:13px}
+
+/* Hinweise */
+#alerts{background:var(--warn-bg);color:var(--warn-ink);padding-block:8px}
+#alerts button{display:block;width:100%;text-align:left;background:none;border:0;padding:5px 0;color:inherit;font-weight:600}
+#alerts small{display:block;font-weight:500;opacity:.85}
+
+/* Board */
+.chips{display:flex;gap:8px;overflow-x:auto;padding-block:12px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 13px;font-weight:600;font-size:13px}
+.chip span{margin-left:7px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chip.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.chip.on span{color:#dfeadb}
+.board{display:grid;gap:12px;grid-template-columns:minmax(0,1fr);background:var(--board);border-radius:10px;padding:12px}
+.col{min-width:0;display:none}
+.col.active{display:block}
+.col h2{margin:0 0 10px;padding:7px 10px;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
+  background:var(--sage);color:var(--sage-ink);border-radius:6px;display:flex;justify-content:space-between}
+.card{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);
+  border-radius:8px;padding:11px 12px;margin-bottom:9px;min-width:0}
+.card.stale{border-color:var(--warn-ink);background:var(--warn-bg);color:var(--warn-ink)}
+.card b{display:block;font-size:15px}
+.card .meta{color:var(--muted);font-size:12.5px;margin-top:2px}
+.card.stale .meta{color:inherit}
+.card p{margin:6px 0 0;font-size:13px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tag{display:inline-block;margin-top:7px;margin-right:6px;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:700;
+  background:var(--ok-bg);color:var(--ok-ink)}
+.tag.w{background:var(--warn-ink);color:var(--warn-bg)}
+.none{color:var(--muted);margin:6px 2px}
+@media (min-width:1000px){
+  .chips{display:none}
+  .board{grid-template-columns:repeat(5,minmax(0,1fr));align-items:start}
+  .col{display:block}
+}
+
+/* Leerzustand, Listen, Formulare */
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:22px 18px;margin-top:14px}
+.empty h2{margin:0 0 6px;font-size:17px}
+.empty p{margin:0 0 14px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;margin-block:12px}
+.panel h3{margin:0 0 10px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+input,select,textarea{width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:10px 11px;background:var(--bg);font-size:16px}
+textarea{resize:vertical;min-height:70px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.appt{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;width:100%;text-align:left;
+  background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 12px;margin-bottom:9px}
+.appt b{font-variant-numeric:tabular-nums}
+.appt small{display:block;color:var(--muted)}
+.hint{color:var(--muted);font-size:12.5px;margin:6px 0 0}
+
+/* Navigation unten */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:25;display:flex;background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs button{flex:1;border:0;background:none;padding:13px 6px;font-weight:600;color:var(--muted);border-top:3px solid transparent}
+.tabs button.on{color:var(--ink);border-top-color:var(--sage)}
+
+/* Detailblatt */
+.sheet{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-top:env(safe-area-inset-top,0px)}
+.sheet-top{position:sticky;top:0;z-index:2;background:var(--dark);color:var(--on-dark);display:flex;align-items:center;gap:12px;padding-block:10px}
+.sheet-top h2{margin:0;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-top button{background:none;border:0;color:var(--on-dark);font-weight:600;padding:4px 0}
+.sheet-body{padding-block:6px 20px;max-width:760px;margin-inline:auto}
+.bar{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding-top:10px;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;flex-wrap:wrap}
+.bar .btn{flex:1 1 0;white-space:nowrap}
+table.pos{width:100%;border-collapse:collapse;font-size:13px}
+table.pos td,table.pos th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+table.pos .r{text-align:right;font-variant-numeric:tabular-nums}
+.tw{overflow-x:auto}
+.sum{display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-variant-numeric:tabular-nums;margin-top:10px}
+.sum .t{font-weight:700;font-size:16px}
+.log{margin:0;padding:0;list-style:none;font-size:13px}
+.log li{padding:4px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:auto 1fr;gap:10px}
+.log time{color:var(--muted);font-variant-numeric:tabular-nums}
+.photo{max-width:100%;border-radius:8px;display:block;margin-top:8px}
+
+/* Dialog + Toast */
+#modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px}
+.dlg{background:var(--surface);border-radius:12px;padding:18px;max-width:380px;width:100%}
+.dlg p{margin:0 0 14px}
+.dlg .row{justify-content:flex-end}
+.btn.pri{background:var(--pri);color:#fff}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:70;
+  background:var(--dark);color:var(--on-dark);padding:10px 16px;border-radius:999px;font-weight:600;max-width:90vw;text-align:center}
+
+/* Dokument (Angebot / Rechnung) */
+#docview{position:fixed;inset:0;z-index:50;background:var(--board);overflow:auto;padding-top:env(safe-area-inset-top,0px)}
+.docbar{position:sticky;top:0;z-index:2;background:var(--dark);color:var(--on-dark);display:flex;gap:8px;align-items:center;padding-block:10px}
+.docbar .sp{flex:1}
+.docbar .btn{background:var(--sage)}
+.docbar .back{background:none;color:var(--on-dark);border:0;font-weight:600}
+.paper{background:var(--paper);color:var(--paper-ink);margin:14px auto;max-width:794px;padding:26px 24px;border-radius:4px;
+  font-size:12.5px;box-shadow:0 1px 8px rgba(0,0,0,.18)}
+.paper h2{margin:0;font-size:20px;text-align:right}
+.p-head{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.p-firm{font-size:17px;font-weight:700}
+.p-r{text-align:right;margin-left:auto}
+.paper table{width:100%;border-collapse:collapse;margin-top:14px}
+.paper th{background:var(--dark);color:var(--on-dark);padding:6px;text-align:left;font-size:11.5px}
+.paper td{padding:6px;border-bottom:1px solid var(--paper-line);vertical-align:top}
+.paper .r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.p-sum{margin-left:auto;margin-top:12px;width:min(290px,100%);display:grid;grid-template-columns:1fr auto;gap:4px 14px;font-variant-numeric:tabular-nums}
+.p-sum .t{font-weight:700;font-size:15px;border-top:1px solid var(--paper-ink);padding-top:6px}
+.p-foot{margin-top:28px;padding-top:8px;border-top:1px solid var(--paper-line);font-size:11px}
+.copybox{margin:0 auto;max-width:794px}
+@media (max-width:480px){
+  .paper{padding:18px 14px}
+  .paper table{font-size:11.5px}
+  .paper th,.paper td{padding:5px 4px}
+  .paper .c-pos{display:none}
+}
+@page{size:A4;margin:14mm}
+@media print{
+  body{padding:0;background:#fff}
+  body::before,.top,#alerts,main,.tabs,.sheet,#modal,#toast,.docbar,.copybox{display:none!important}
+  #docview{position:static;background:#fff;overflow:visible;padding:0}
+  .paper{box-shadow:none;margin:0;max-width:none;padding:0}
+  .paper th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+
+<header class="top gut">
+  <h1>HandwerkFlow</h1>
+  <button class="btn" data-act="new">+ Neue Anfrage</button>
+</header>
+<div id="alerts" class="gut" hidden></div>
+<main id="view" class="gut"></main>
+<nav class="tabs" aria-label="Bereiche">
+  <button data-act="tab" data-k="board">Aufgaben</button>
+  <button data-act="tab" data-k="appts">Termine</button>
+  <button data-act="tab" data-k="settings">Einstellungen</button>
+</nav>
+<div id="sheet" class="sheet" hidden></div>
+<div id="docview" hidden></div>
+<div id="modal" hidden></div>
+<div id="toast" hidden></div>
+
+<script>
+/* ======================= LOGIK (ohne DOM, testbar) ======================= */
+const STATUSES=[['neu','Neue Anfrage'],['beantwortet','Beantwortet'],['terminiert','Terminiert'],['erledigt','Erledigt'],['abgerechnet','Abgerechnet']];
+const SL=Object.fromEntries(STATUSES);
+const CHANNELS=['WhatsApp','SMS','E-Mail','Webseite','Telefon','Sonstiges'];
+const DEFAULTS={firma:'Mein Handwerksbetrieb',inhaber:'',strasse:'',plz_ort:'',telefon:'',email:'',steuernr:'',iban:'',bic:'',
+  stundensatz:'65',mwst:'19',kleinunternehmer:'0',zahlungsziel:'14',followup_stunden:'48'};
+const KEY='handwerkflow_v1';
+let db={settings:{...DEFAULTS},requests:[],nextId:1,counters:{}};
+let storageOk=true;
+
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+const tsd=s=>s?new Date(s):null;
+const r2=x=>Math.round((x+Number.EPSILON)*100)/100;
+function num(s){
+  if(s==null)return 0;
+  s=String(s).trim().replace('€','').replace(/\s/g,'');
+  if(!s)return 0;
+  if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+  const v=Number(s);
+  if(Number.isNaN(v))throw new Error('Bitte nur Zahlen eingeben.');
+  return v;
+}
+const fmtNum=x=>String(r2(x)).replace('.',',');
+const eur=x=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(x).replace(/ /g,' ');
+function fmtDT(s,time=true){
+  const d=tsd(s); if(!d)return '';
+  const date=`${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}`;
+  return time?`${date} ${pad(d.getHours())}:${pad(d.getMinutes())}`:date;
+}
+function ageText(s,now){
+  const d=tsd(s); if(!d)return '';
+  const h=Math.floor((now-d)/3600000);
+  return h<1?'gerade eben':h<48?`${h} Std.`:`${Math.floor(h/24)} Tage`;
+}
+const byId=id=>db.requests.find(r=>r.id===id);
+function log(r,text,now=new Date()){r.events.unshift({ts:iso(now),text})}
+function touch(r,now=new Date()){r.updated=iso(now)}
+
+function createRequest(f,now=new Date()){
+  if(!(f.customer||'').trim())throw new Error('Bitte einen Kundennamen angeben.');
+  const r={id:db.nextId++,created:iso(now),updated:iso(now),status:'neu',customer:f.customer.trim(),contact:f.contact||'',
+    custAddr:f.custAddr||'',channel:f.channel||CHANNELS[0],desc:f.desc||'',photo:f.photo||'',address:f.address||'',appt:'',
+    supplies:'',hours:0,rate:num(db.settings.stundensatz),material:0,notes:'',positions:[],
+    quoteNo:'',quoteDate:'',invoiceNo:'',invoiceDate:'',events:[]};
+  log(r,`Anfrage über ${r.channel} eingegangen`,now);
+  db.requests.push(r);
+  return r;
+}
+function setStatus(r,st,now=new Date()){
+  if(!SL[st])throw new Error('Unbekannter Status');
+  if(r.status===st)return;
+  log(r,`Status: ${SL[r.status]} → ${SL[st]}`,now);
+  r.status=st;touch(r,now);
+}
+function calc(r){
+  const lines=[];
+  if(r.hours>0)lines.push({d:'Arbeitszeit',q:r.hours,u:'Std.',p:r.rate||0});
+  if(r.material>0)lines.push({d:'Material',q:1,u:'pausch.',p:r.material});
+  for(const p of r.positions)lines.push({d:p.d,q:p.q,u:p.u,p:p.p});
+  const net=r2(lines.reduce((s,l)=>s+l.q*l.p,0));
+  const klein=db.settings.kleinunternehmer==='1';
+  const rate=klein?0:num(db.settings.mwst);
+  const vat=r2(net*rate/100);
+  return {lines,net,rate,vat,gross:r2(net+vat),klein};
+}
+function nextNumber(prefix,now=new Date()){
+  const y=now.getFullYear(),k=`${prefix}_${y}`;
+  db.counters[k]=(db.counters[k]||0)+1;
+  return `${prefix}-${y}-${String(db.counters[k]).padStart(4,'0')}`;
+}
+function createQuote(r,now=new Date()){
+  if(r.quoteNo)return r.quoteNo;
+  r.quoteNo=nextNumber('A',now);r.quoteDate=iso(now);touch(r,now);
+  log(r,`Angebot ${r.quoteNo} erstellt`,now);
+  if(r.status==='neu')setStatus(r,'beantwortet',now);
+  return r.quoteNo;
+}
+function createInvoice(r,now=new Date()){
+  if(r.invoiceNo)return r.invoiceNo;
+  if(calc(r).net<=0)throw new Error('Es gibt noch keine Arbeitszeit, kein Material und keine Positionen zum Abrechnen.');
+  r.invoiceNo=nextNumber('R',now);r.invoiceDate=iso(now);touch(r,now);
+  log(r,`Rechnung ${r.invoiceNo} erstellt`,now);
+  setStatus(r,'abgerechnet',now);
+  return r.invoiceNo;
+}
+const NUM='(\\d+(?:[.,]\\d+)?)';
+function parseQuickNote(text){
+  const t=(text||'').toLowerCase(),out={};
+  let hours=0,m;
+  for(const x of t.matchAll(new RegExp(NUM+'\\s*(?:stunden|stunde|std\\.?|h)(?![a-zäöü])','g')))hours+=num(x[1]);
+  for(const x of t.matchAll(new RegExp(NUM+'\\s*(?:minuten|min\\.?)(?![a-zäöü])','g')))hours+=num(x[1])/60;
+  if(hours)out.hours=r2(hours);
+  m=t.match(new RegExp('material\\w*\\D{0,20}?'+NUM+'\\s*(?:€|euro|eur)?'))||t.match(new RegExp(NUM+'\\s*(?:€|euro|eur)\\s*(?:für|fuer)?\\s*material'));
+  if(m)out.material=num(m[1]);
+  m=t.match(new RegExp('stundensatz\\D{0,10}?'+NUM));
+  if(m)out.rate=num(m[1]);
+  return out;
+}
+function alerts(now=new Date()){
+  const limit=(num(db.settings.followup_stunden)||48)*3600000;
+  const res={stale:[],unbilled:[],appointments:[]};
+  for(const r of db.requests){
+    const upd=tsd(r.updated),appt=tsd(r.appt);
+    if(['neu','beantwortet','terminiert'].includes(r.status)){
+      const waiting=r.status==='terminiert'&&appt&&appt>now;
+      if(!waiting&&now-upd>limit)res.stale.push(r);
+    }
+    if(r.status==='erledigt')res.unbilled.push(r);
+    if(r.status==='terminiert'&&appt&&appt>=now&&appt-now<=86400000)res.appointments.push(r);
+  }
+  return res;
+}
+function alertItems(a){
+  const out=[];
+  for(const r of a.stale)out.push({id:r.id,t:`Nachfassen: ${r.customer}`,s:`Seit über ${db.settings.followup_stunden||48} Std. ohne Bewegung (${SL[r.status]})`});
+  for(const r of a.unbilled)out.push({id:r.id,t:`Abrechnen: ${r.customer}`,s:'Auftrag erledigt, noch keine Rechnung'});
+  for(const r of a.appointments)out.push({id:r.id,t:`Termin: ${r.customer}, ${fmtDT(r.appt)}`,s:`${r.address||'Ort offen'}. Material: ${r.supplies||'-'}`});
+  return out;
+}
+function seedDemo(now=new Date()){
+  const h=n=>new Date(now-n*3600000);
+  const rows=[
+    ['Familie Berger','WhatsApp','Wasserhahn in der Küche tropft, Foto folgt','neu',60,null],
+    ['Bäckerei Schulz','E-Mail','Neue Steckdosen im Verkaufsraum (4 Stück)','neu',5,null],
+    ['Herr Yilmaz','Webseite','Badezimmer: Fliesen erneuern, ca. 8 m²','beantwortet',30,null],
+    ['Frau Weber','SMS','Gartentor streichen und Scharniere ölen','terminiert',20,new Date(+now+18*3600000)],
+    ['Praxis Dr. König','Telefon','Regalwand im Wartezimmer aufbauen','terminiert',100,new Date(+now+4*86400000)],
+    ['Familie Hoffmann','WhatsApp','Heizkörper entlüften und Thermostat tauschen','erledigt',6,null]];
+  for(const [c,ch,d,st,age,appt] of rows){
+    const r=createRequest({customer:c,channel:ch,desc:d,address:'Musterstraße 12, 10115 Berlin',custAddr:`${c}\nMusterstraße 12\n10115 Berlin`},h(age));
+    if(appt){r.appt=iso(appt);r.supplies='Pinsel, Farbe weiß, Öl';}
+    if(st==='erledigt'){r.hours=2.5;r.material=48.9;}
+    r.status=st;r.updated=iso(h(age));
+  }
+}
+function docModel(r,kind){
+  const inv=kind==='rechnung',s=db.settings,c=calc(r);
+  const no=inv?r.invoiceNo:r.quoteNo,date=inv?r.invoiceDate:r.quoteDate;
+  if(!no)throw new Error('Bitte zuerst das Dokument anlegen.');
+  const notes=[];
+  if(c.klein)notes.push('Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.');
+  if(inv){
+    const due=new Date(tsd(date));due.setDate(due.getDate()+(num(s.zahlungsziel)||14));
+    notes.push(`Bitte überweisen Sie den Betrag bis zum ${fmtDT(iso(due),false)} unter Angabe der Rechnungsnummer.`);
+  }else notes.push('Dieses Angebot ist 30 Tage gültig. Vielen Dank für Ihre Anfrage!');
+  const foot=[];
+  if(s.steuernr)foot.push(`Steuernr.: ${s.steuernr}`);
+  if(s.iban)foot.push(`IBAN: ${s.iban}${s.bic?'  BIC: '+s.bic:''}`);
+  return {inv,no,date:fmtDT(date,false),title:inv?'RECHNUNG':'ANGEBOT',c,notes,foot,
+    ld:inv?fmtDT(r.appt||r.invoiceDate,false):''};
+}
+function docText(r,kind){
+  const m=docModel(r,kind),s=db.settings,L=[];
+  L.push(s.firma,[s.inhaber,s.strasse,s.plz_ort].filter(Boolean).join(', '),'');
+  L.push(`${m.title} Nr. ${m.no}, ${m.date}`,'',r.customer);
+  if(r.custAddr)L.push(...r.custAddr.split('\n').filter(l=>l.trim()&&l.trim()!==r.customer));
+  L.push('');
+  if(m.inv)L.push(`Leistungsdatum: ${m.ld}`);
+  L.push(`Leistung: ${r.desc.replace(/\n/g,' ')}`,'');
+  m.c.lines.forEach((l,i)=>L.push(`${i+1}. ${l.d}: ${fmtNum(l.q)} ${l.u} × ${eur(l.p)} = ${eur(l.q*l.p)}`));
+  L.push('',`Netto: ${eur(m.c.net)}`);
+  if(!m.c.klein)L.push(`MwSt. ${fmtNum(m.c.rate)} %: ${eur(m.c.vat)}`);
+  L.push(`Gesamtbetrag: ${eur(m.c.gross)}`,'',...m.notes,'',m.foot.join(' | '));
+  return L.join('\n');
+}
+
+/* ============================ UI ============================ */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const embedded=(()=>{try{return window.self!==window.top}catch(e){return true}})();
+const ui={tab:'board',status:'neu',open:null,doc:null};
+
+function load(){
+  try{
+    const raw=localStorage.getItem(KEY);
+    if(raw){const d=JSON.parse(raw);db={...db,...d,settings:{...DEFAULTS,...(d.settings||{})}};}
+  }catch(e){storageOk=false}
+}
+function persist(){
+  try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){storageOk=false;renderAll()}
+}
+let toastT;
+function toast(msg){
+  const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2800);
+}
+function ask(msg,yes='Ja',no='Abbrechen'){
+  return new Promise(res=>{
+    const m=$('#modal');
+    m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true"><p>${esc(msg)}</p><div class="row"><button class="btn ghost" data-m="0">${esc(no)}</button><button class="btn pri" data-m="1">${esc(yes)}</button></div></div>`;
+    m.hidden=false;
+    m.onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;m.hidden=true;m.onclick=null;res(b.dataset.m==='1')};
+  });
+}
+
+/* ---- Aufgaben ---- */
+function cardHTML(r,stale,now){
+  let sub=`${esc(r.channel)} · ${ageText(r.updated,now)}`;
+  if(r.status==='terminiert'&&r.appt)sub=`Termin ${fmtDT(r.appt)}`;
+  if(r.invoiceNo)sub=`${esc(r.invoiceNo)} · ${sub}`;
+  return `<button class="card ${stale?'stale':''}" data-act="open" data-id="${r.id}">
+    <b>${esc(r.customer)}</b><div class="meta">${sub}</div>
+    ${r.desc?`<p>${esc(r.desc)}</p>`:''}
+    ${stale?'<span class="tag w">Nachfassen</span>':''}${r.photo?'<span class="tag">Foto</span>':''}</button>`;
+}
+function boardHTML(){
+  const now=new Date(),stale=new Set(alerts(now).stale.map(r=>r.id));
+  if(!db.requests.length){
+    return `<div class="empty"><h2>Noch keine Aufträge</h2>
+      <p>Lege die erste Kundenanfrage an oder lade sechs Beispielaufträge, um den ganzen Ablauf von der Anfrage bis zur Rechnung auszuprobieren.</p>
+      <div class="row"><button class="btn" data-act="new">Anfrage anlegen</button><button class="btn ghost" data-act="demo">Beispieldaten laden</button></div></div>`;
+  }
+  const list=k=>db.requests.filter(r=>r.status===k).sort((a,b)=>b.updated.localeCompare(a.updated));
+  const chips=STATUSES.map(([k,l])=>`<button class="chip ${k===ui.status?'on':''}" data-act="status" data-k="${k}">${l}<span>${list(k).length}</span></button>`).join('');
+  const cols=STATUSES.map(([k,l])=>{
+    const rs=list(k);
+    return `<section class="col ${k===ui.status?'active':''}"><h2>${l}<span>${rs.length}</span></h2>${rs.map(r=>cardHTML(r,stale.has(r.id),now)).join('')||'<p class="none">Keine Karten</p>'}</section>`;
+  }).join('');
+  return `<div class="chips" role="tablist">${chips}</div><div class="board">${cols}</div>`;
+}
+function apptsHTML(){
+  const rs=db.requests.filter(r=>r.appt&&r.status==='terminiert').sort((a,b)=>a.appt.localeCompare(b.appt));
+  if(!rs.length)return `<div class="empty"><h2>Keine Termine</h2><p>Sobald du bei einem Auftrag einen Termin einträgst, erscheint er hier mit Ort und Material.</p></div>`;
+  return `<div style="padding-top:14px">`+rs.map(r=>`<button class="appt" data-act="open" data-id="${r.id}">
+    <div><b>${fmtDT(r.appt)}</b> · ${esc(r.customer)}<small>${esc(r.address||'Ort offen')}</small><small>Material: ${esc(r.supplies||'-')}</small></div></button>`).join('')+`</div>`;
+}
+function settingsHTML(){
+  const s=db.settings;
+  const f=(k,l,ph='')=>`<label for="s_${k}">${l}</label><input id="s_${k}" value="${esc(s[k])}" placeholder="${ph}" autocomplete="off">`;
+  return `<div class="panel"><h3>Firma (erscheint auf Angebot und Rechnung)</h3>
+    ${f('firma','Firmenname')}${f('inhaber','Inhaber/in')}${f('strasse','Straße und Nr.')}${f('plz_ort','PLZ und Ort')}
+    <div class="g2"><div>${f('telefon','Telefon')}</div><div>${f('email','E-Mail')}</div></div>
+    ${f('steuernr','Steuernummer oder USt-IdNr.')}${f('iban','IBAN')}${f('bic','BIC')}</div>
+    <div class="panel"><h3>Preise und Erinnerungen</h3>
+    <div class="g2"><div>${f('stundensatz','Stundensatz (€)')}</div><div>${f('mwst','MwSt. (%)')}</div></div>
+    <div class="g2"><div>${f('zahlungsziel','Zahlungsziel (Tage)')}</div><div>${f('followup_stunden','Nachfassen nach (Std.)')}</div></div>
+    <label style="display:flex;gap:10px;align-items:center;margin-top:14px"><input type="checkbox" id="s_klein" style="width:auto" ${s.kleinunternehmer==='1'?'checked':''}> Kleinunternehmer (§ 19 UStG, keine MwSt. ausweisen)</label></div>
+    <div class="row"><button class="btn" data-act="saveSettings">Speichern</button><button class="btn ghost" data-act="demo">Beispieldaten laden</button></div>
+    <div class="panel"><h3>Backup</h3>
+    <p class="hint" style="margin-top:0">Alle Daten liegen nur in diesem Browser auf diesem Gerät. Kopiere ein Backup und speichere es zum Beispiel in einer Notiz.</p>
+    <div class="row" style="margin-top:10px"><button class="btn ghost sm" data-act="backupCopy">Backup kopieren</button></div><div id="bkbox"></div>
+    <label for="bk">Backup einfügen und wiederherstellen</label><textarea id="bk" placeholder="Backup-Text hier einfügen"></textarea>
+    <div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="backupRestore">Wiederherstellen</button></div></div>`;
+}
+function renderAlerts(){
+  const el=$('#alerts'),items=alertItems(alerts());
+  const warn=!storageOk?`<button disabled>Speichern auf diesem Gerät nicht möglich<small>Änderungen gehen beim Schließen verloren. Erstelle ein Backup unter Einstellungen.</small></button>`:'';
+  if(!items.length&&!warn){el.hidden=true;return}
+  el.innerHTML=warn+items.slice(0,4).map(i=>`<button data-act="open" data-id="${i.id}">${esc(i.t)}<small>${esc(i.s)}</small></button>`).join('')+
+    (items.length>4?`<button disabled>und ${items.length-4} weitere</button>`:'');
+  el.hidden=false;
+}
+function renderView(){
+  $('#view').innerHTML=ui.tab==='board'?boardHTML():ui.tab==='appts'?apptsHTML():settingsHTML();
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.k===ui.tab));
+}
+function renderAll(){renderAlerts();renderView();if(ui.open!=null&&!$('#sheet').hidden)renderSheet(true)}
+
+/* ---- Detailblatt ---- */
+function renderSheet(keepScroll){
+  const r=byId(ui.open);if(!r){closeSheet();return}
+  const sh=$('#sheet'),top=keepScroll?sh.scrollTop:0,c=calc(r);
+  const val=(id,v,extra='')=>`<input id="${id}" value="${esc(v)}" ${extra}>`;
+  sh.innerHTML=`<div class="sheet-top gut"><button data-act="close">Zurück</button><h2>${esc(r.customer)}</h2><span>${SL[r.status]}</span></div>
+  <div class="sheet-body gut">
+   <div class="panel"><h3>Kunde und Anliegen</h3>
+    <label for="f_customer">Kunde</label>${val('f_customer',r.customer)}
+    <div class="g2"><div><label for="f_contact">Telefon / E-Mail</label>${val('f_contact',r.contact)}</div>
+    <div><label for="f_channel">Kanal</label><select id="f_channel">${CHANNELS.map(c=>`<option ${c===r.channel?'selected':''}>${c}</option>`).join('')}</select></div></div>
+    <label for="f_desc">Anliegen</label><textarea id="f_desc">${esc(r.desc)}</textarea>
+    <label for="f_custAddr">Kundenadresse (für die Rechnung)</label><textarea id="f_custAddr" style="min-height:62px">${esc(r.custAddr)}</textarea>
+    <label for="f_photo">Foto vom Auftrag</label><input id="f_photo" type="file" accept="image/*">
+    ${r.photo?`<img class="photo" src="${r.photo}" alt="Foto zum Auftrag"><button class="btn ghost sm" data-act="rmPhoto" style="margin-top:8px">Foto entfernen</button>`:''}</div>
+   <div class="panel"><h3>Termin</h3>
+    <label for="f_status">Status</label><select id="f_status">${STATUSES.map(([k,l])=>`<option value="${k}" ${k===r.status?'selected':''}>${l}</option>`).join('')}</select>
+    <label for="f_appt">Termin</label><input id="f_appt" type="datetime-local" value="${esc((r.appt||'').slice(0,16))}">
+    <label for="f_address">Einsatzort</label>${val('f_address',r.address)}
+    <label for="f_supplies">Material und Werkzeug mitbringen</label>${val('f_supplies',r.supplies)}</div>
+   <div class="panel"><h3>Schnell-Erfassung</h3>
+    <p class="hint" style="margin-top:0">Notiz tippen oder mit dem Mikrofon der iPhone-Tastatur diktieren, zum Beispiel „2,5 Stunden gearbeitet, Material 120 Euro“.</p>
+    <textarea id="f_quick" placeholder="Notiz zum Einsatz"></textarea>
+    <button class="btn ghost sm" data-act="quick" style="margin-top:8px">Auswerten und übernehmen</button>
+    <label for="f_notes">Notizen</label><textarea id="f_notes" style="min-height:56px">${esc(r.notes)}</textarea></div>
+   <div class="panel"><h3>Preis</h3>
+    <div class="g3"><div><label for="f_hours">Stunden</label>${val('f_hours',r.hours?fmtNum(r.hours):'','inputmode="decimal"')}</div>
+    <div><label for="f_rate">Satz (€/Std.)</label>${val('f_rate',fmtNum(r.rate||0),'inputmode="decimal"')}</div>
+    <div><label for="f_material">Material (€)</label>${val('f_material',r.material?fmtNum(r.material):'','inputmode="decimal"')}</div></div>
+    <label>Weitere Positionen</label>
+    ${r.positions.length?`<div class="tw"><table class="pos"><tbody>${r.positions.map((p,i)=>`<tr><td>${esc(p.d)}</td><td class="r">${fmtNum(p.q)} ${esc(p.u)}</td><td class="r">${eur(p.p)}</td><td class="r"><button class="btn ghost sm" data-act="delPos" data-i="${i}" aria-label="Position löschen">×</button></td></tr>`).join('')}</tbody></table></div>`:''}
+    <div class="g2" style="margin-top:8px"><input id="p_d" placeholder="Beschreibung"><input id="p_p" placeholder="Einzelpreis €" inputmode="decimal"></div>
+    <div class="g3" style="margin-top:8px"><input id="p_q" value="1" inputmode="decimal" aria-label="Menge"><input id="p_u" value="Stk." aria-label="Einheit"><button class="btn ghost" data-act="addPos">Hinzufügen</button></div>
+    <div class="sum"><span>Netto</span><span>${eur(c.net)}</span>${c.klein?'':`<span>MwSt. ${fmtNum(c.rate)} %</span><span>${eur(c.vat)}</span>`}<span class="t">Gesamt</span><span class="t">${eur(c.gross)}</span></div>
+    <p class="hint">${r.quoteNo?'Angebot '+esc(r.quoteNo):''}${r.quoteNo&&r.invoiceNo?' · ':''}${r.invoiceNo?'Rechnung '+esc(r.invoiceNo):''}</p></div>
+   <div class="panel"><h3>Verlauf</h3><ul class="log">${r.events.map(e=>`<li><time>${fmtDT(e.ts)}</time><span>${esc(e.text)}</span></li>`).join('')}</ul></div>
+   <div class="row"><button class="btn warn sm" data-act="del">Auftrag löschen</button></div>
+  </div>
+  <div class="bar gut"><button class="btn pri" data-act="save">Speichern</button>
+   <button class="btn" data-act="quote">Angebot</button>
+   ${r.status==='erledigt'||r.status==='abgerechnet'?`<button class="btn" data-act="invoice">Rechnung</button>`:`<button class="btn" data-act="done">Erledigt</button>`}</div>`;
+  sh.hidden=false;sh.scrollTop=top;
+}
+function openSheet(id){ui.open=id;renderSheet(false);document.body.style.overflow='hidden'}
+function closeSheet(){ui.open=null;$('#sheet').hidden=true;document.body.style.overflow='';renderAll()}
+const g=id=>{const e=document.getElementById(id);return e?e.value:''};
+function saveSheet(){
+  const r=byId(ui.open);if(!r)return false;
+  let hours,rate,mat;
+  try{hours=num(g('f_hours'));rate=num(g('f_rate'));mat=num(g('f_material'))}
+  catch(e){toast('Bitte bei Stunden, Satz und Material nur Zahlen eingeben.');return false}
+  if(!g('f_customer').trim()){toast('Bitte einen Kundennamen angeben.');return false}
+  Object.assign(r,{customer:g('f_customer').trim(),contact:g('f_contact'),channel:g('f_channel'),desc:g('f_desc').trim(),
+    custAddr:g('f_custAddr').trim(),address:g('f_address'),supplies:g('f_supplies'),notes:g('f_notes').trim(),hours,rate,material:mat});
+  const appt=g('f_appt')?g('f_appt')+':00':'';
+  r.appt=appt;
+  touch(r);
+  const want=g('f_status');
+  if(want!==r.status){
+    if(want==='abgerechnet'){try{createInvoice(r)}catch(e){toast(e.message);return false}}
+    else setStatus(r,want);
+  }else if(appt&&['neu','beantwortet'].includes(r.status))setStatus(r,'terminiert');
+  persist();renderView();renderAlerts();
+  return true;
+}
+function downscale(file){
+  return new Promise((res,rej)=>{
+    const img=new Image(),url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const k=Math.min(1,900/Math.max(img.width,img.height)),cv=document.createElement('canvas');
+      cv.width=Math.round(img.width*k);cv.height=Math.round(img.height*k);
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      URL.revokeObjectURL(url);res(cv.toDataURL('image/jpeg',.65));
+    };
+    img.onerror=()=>rej(new Error('Bild konnte nicht gelesen werden.'));
+    img.src=url;
+  });
+}
+
+/* ---- Neue Anfrage ---- */
+function openNew(){
+  ui.open=null;
+  const sh=$('#sheet');
+  sh.innerHTML=`<div class="sheet-top gut"><button data-act="close">Abbrechen</button><h2>Neue Anfrage</h2><span></span></div>
+  <div class="sheet-body gut"><div class="panel">
+   <label for="n_customer">Kunde</label><input id="n_customer" autocomplete="off">
+   <div class="g2"><div><label for="n_contact">Telefon / E-Mail</label><input id="n_contact"></div>
+   <div><label for="n_channel">Eingegangen über</label><select id="n_channel">${CHANNELS.map(c=>`<option>${c}</option>`).join('')}</select></div></div>
+   <label for="n_address">Einsatzort</label><input id="n_address">
+   <label for="n_desc">Anliegen</label><textarea id="n_desc"></textarea>
+   <label for="n_photo">Foto</label><input id="n_photo" type="file" accept="image/*"></div></div>
+  <div class="bar gut"><button class="btn pri" data-act="create">Anfrage anlegen</button></div>`;
+  sh.hidden=false;sh.scrollTop=0;document.body.style.overflow='hidden';
+}
+async function createFromForm(){
+  try{
+    let photo='';const f=$('#n_photo').files[0];
+    if(f)photo=await downscale(f);
+    const r=createRequest({customer:g('n_customer'),contact:g('n_contact'),channel:g('n_channel'),address:g('n_address'),desc:g('n_desc').trim(),photo});
+    if(photo)log(r,'Foto angehängt');
+    persist();ui.status='neu';ui.tab='board';closeSheet();toast('Anfrage angelegt');
+  }catch(e){toast(e.message)}
+}
+
+/* ---- Dokument ---- */
+function showDoc(r,kind){
+  let m;try{m=docModel(r,kind)}catch(e){toast(e.message);return}
+  const s=db.settings,addr=(r.custAddr||'').split('\n').filter(l=>l.trim()&&l.trim()!==r.customer);
+  ui.doc={id:r.id,kind};
+  $('#docview').innerHTML=`<div class="docbar gut"><button class="back" data-act="docClose">Zurück</button><span class="sp"></span>
+   <button class="btn sm" data-act="docCopy">Text kopieren</button>${embedded?'':'<button class="btn sm" data-act="docPrint">Drucken / PDF</button>'}</div>
+  <div class="gut"><div class="paper">
+   <div class="p-head"><div><div class="p-firm">${esc(s.firma)}</div>${[s.inhaber,s.strasse,s.plz_ort,[s.telefon,s.email].filter(Boolean).join(' · ')].filter(Boolean).map(esc).join('<br>')}</div>
+    <div class="p-r"><h2>${m.title}</h2>Nr. ${esc(m.no)}<br>Datum: ${m.date}</div></div>
+   <p style="margin-top:22px"><b>${esc(r.customer)}</b><br>${addr.map(esc).join('<br>')}</p>
+   ${m.inv?`<p>Leistungsdatum: ${m.ld}</p>`:''}<p>Leistung: ${esc(r.desc.replace(/\n/g,' '))}</p>
+   <div class="tw"><table><thead><tr><th class="c-pos">Pos.</th><th>Beschreibung</th><th class="r">Menge</th><th class="r">Einzelpreis</th><th class="r">Gesamt</th></tr></thead><tbody>
+   ${m.c.lines.map((l,i)=>`<tr><td class="c-pos">${i+1}</td><td>${esc(l.d)}</td><td class="r">${fmtNum(l.q)} ${esc(l.u)}</td><td class="r">${eur(l.p)}</td><td class="r">${eur(l.q*l.p)}</td></tr>`).join('')}</tbody></table></div>
+   <div class="p-sum"><span>Netto</span><span>${eur(m.c.net)}</span>${m.c.klein?'':`<span>zzgl. ${fmtNum(m.c.rate)} % MwSt.</span><span>${eur(m.c.vat)}</span>`}<span class="t">Gesamtbetrag</span><span class="t">${eur(m.c.gross)}</span></div>
+   <p style="margin-top:22px">${m.notes.map(esc).join('<br>')}</p>
+   <div class="p-foot">${m.foot.map(esc).join(' &nbsp;|&nbsp; ')}</div></div>
+   <div class="copybox" id="copybox"></div></div>`;
+  $('#docview').hidden=false;$('#docview').scrollTop=0;
+}
+async function copyText(text,boxId){
+  try{await navigator.clipboard.writeText(text);toast('Kopiert');return}catch(e){}
+  const b=document.getElementById(boxId);
+  if(b){b.innerHTML=`<div class="panel"><p class="hint" style="margin-top:0">Kopieren ist hier nicht erlaubt. Text markieren und kopieren:</p><textarea id="${boxId}_t" style="min-height:160px">${esc(text)}</textarea></div>`;
+    const t=document.getElementById(boxId+'_t');t.focus();t.select()}
+}
+
+/* ---- Aktionen ---- */
+const A={
+  tab:e=>{ui.tab=e.k;renderView()},
+  status:e=>{ui.status=e.k;renderView()},
+  open:e=>openSheet(Number(e.id)),
+  new:()=>openNew(),
+  close:()=>closeSheet(),
+  create:()=>createFromForm(),
+  save:()=>{if(saveSheet()){toast('Gespeichert');renderSheet(true)}},
+  async demo(){
+    if(db.requests.length&&!await ask('Sechs Beispielaufträge zusätzlich hinzufügen?','Hinzufügen'))return;
+    seedDemo();persist();ui.tab='board';renderAll();toast('Beispieldaten geladen');
+  },
+  saveSettings:()=>{
+    try{['stundensatz','mwst','zahlungsziel','followup_stunden'].forEach(k=>num(g('s_'+k)))}
+    catch(e){toast('Bei Preisen und Fristen bitte nur Zahlen eingeben.');return}
+    for(const k of Object.keys(DEFAULTS))if(k!=='kleinunternehmer')db.settings[k]=g('s_'+k).trim();
+    db.settings.kleinunternehmer=$('#s_klein').checked?'1':'0';
+    persist();renderAlerts();toast('Einstellungen gespeichert');
+  },
+  async addPos(){
+    if(!saveSheet())return;
+    const r=byId(ui.open);let q,p;
+    try{q=num(g('p_q'));p=num(g('p_p'))}catch(e){toast('Menge und Preis müssen Zahlen sein.');return}
+    if(!g('p_d').trim()){toast('Bitte eine Beschreibung eingeben.');return}
+    r.positions.push({d:g('p_d').trim(),q,u:g('p_u')||'Stk.',p});touch(r);persist();renderSheet(true);
+  },
+  delPos:e=>{if(!saveSheet())return;const r=byId(ui.open);r.positions.splice(Number(e.i),1);touch(r);persist();renderSheet(true)},
+  rmPhoto:()=>{const r=byId(ui.open);r.photo='';touch(r);persist();renderSheet(true)},
+  quick:()=>{
+    const found=parseQuickNote(g('f_quick'));
+    const set=(id,v)=>{document.getElementById(id).value=fmtNum(v)};
+    if(found.hours!=null)set('f_hours',found.hours);
+    if(found.material!=null)set('f_material',found.material);
+    if(found.rate!=null)set('f_rate',found.rate);
+    const t=g('f_quick').trim();
+    if(t){const n=document.getElementById('f_notes');n.value=(n.value?n.value+'\n':'')+t;document.getElementById('f_quick').value=''}
+    const parts=[];
+    if(found.hours!=null)parts.push(`${fmtNum(found.hours)} Std.`);
+    if(found.material!=null)parts.push(`Material ${eur(found.material)}`);
+    if(found.rate!=null)parts.push(`Satz ${eur(found.rate)}`);
+    toast(parts.length?'Übernommen: '+parts.join(', ')+'. Bitte speichern.':'Nichts Eindeutiges erkannt, Text in Notizen übernommen.');
+  },
+  quote:()=>{
+    if(!saveSheet())return;const r=byId(ui.open);
+    if(!r.quoteNo&&calc(r).net<=0){toast('Bitte erst Stunden, Material oder Positionen eintragen.');return}
+    createQuote(r);persist();renderAll();showDoc(r,'angebot');
+  },
+  async done(){
+    if(!saveSheet())return;const r=byId(ui.open);
+    setStatus(r,'erledigt');persist();renderAll();
+    if(await ask('Auftrag erledigt. Jetzt die Rechnung aus dem Angebot erstellen?','Rechnung erstellen','Später'))A.invoice();
+  },
+  invoice:()=>{
+    if(!saveSheet())return;const r=byId(ui.open);
+    try{createInvoice(r)}catch(e){toast(e.message);return}
+    persist();renderAll();showDoc(r,'rechnung');
+  },
+  async del(){
+    if(!await ask('Diesen Auftrag endgültig löschen?','Löschen'))return;
+    db.requests=db.requests.filter(r=>r.id!==ui.open);persist();closeSheet();toast('Gelöscht');
+  },
+  docClose:()=>{$('#docview').hidden=true;ui.doc=null},
+  docCopy:()=>{const r=byId(ui.doc.id);copyText(docText(r,ui.doc.kind),'copybox')},
+  docPrint:()=>{try{window.print()}catch(e){toast('Drucken ist hier nicht möglich.')}},
+  backupCopy:()=>copyText(JSON.stringify(db),'bkbox'),
+  async backupRestore(){
+    try{
+      const d=JSON.parse(g('bk'));if(!Array.isArray(d.requests))throw 0;
+      if(!await ask('Alle aktuellen Daten durch das Backup ersetzen?','Ersetzen'))return;
+      db={settings:{...DEFAULTS,...(d.settings||{})},requests:d.requests,nextId:d.nextId||d.requests.length+1,counters:d.counters||{}};
+      persist();renderAll();toast('Backup wiederhergestellt');
+    }catch(e){toast('Das ist kein gültiges Backup.')}
+  }
+};
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]');if(!el||el.disabled)return;
+  const fn=A[el.dataset.act];if(fn)fn(el.dataset);
+});
+document.addEventListener('change',async e=>{
+  if(e.target.id==='f_photo'&&e.target.files[0]){
+    if(!saveSheet())return;
+    try{const r=byId(ui.open);r.photo=await downscale(e.target.files[0]);log(r,'Foto angehängt');touch(r);persist();renderSheet(true)}
+    catch(err){toast(err.message)}
+  }
+});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)renderAlerts()});
+setInterval(()=>{renderAlerts();if(ui.open==null)renderView()},60000);
+
+/* Start */
+load();
+renderAll();
+</script>
+
+<script>if('serviceWorker' in navigator && location.protocol.startsWith('http')){navigator.serviceWorker.register('sw.js').catch(function(){});}</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+HandwerkFlow fürs iPhone (installierbare Web-App)
+
+Diese Dateien müssen unter einer https-Adresse liegen, damit das iPhone die App installieren
+und offline nutzen kann. Das geht mit jedem statischen Webhoster, zum Beispiel
+Netlify Drop, GitHub Pages oder Cloudflare Pages: den ganzen Ordner (index.html, sw.js,
+manifest.webmanifest und die drei PNG-Dateien) hochladen.
+
+Auf dem iPhone
+1. Die https-Adresse in Safari öffnen (nicht in einem anderen Browser).
+2. Teilen-Symbol tippen und "Zum Home-Bildschirm" wählen, dann "Hinzufügen".
+3. Die App vom Home-Bildschirm starten. Sie funktioniert danach auch ohne Netz.
+4. Unter Einstellungen Firmendaten eintragen, dann "Beispieldaten laden" für eine Demo.
+
+Angebot/Rechnung als PDF: Dokument öffnen, "Drucken / PDF" tippen, in der Druckvorschau
+mit zwei Fingern auf die Seite zoomen und über das Teilen-Symbol "In Dateien sichern" wählen.
+
+Daten: liegen nur im Safari-Speicher dieses iPhones. Unter Einstellungen > Backup kopieren
+und zum Beispiel in einer Notiz sichern. Wer die Website-Daten in Safari löscht, löscht auch die Aufträge.
+Wichtig: Die App lieber nicht unter einer anderen Adresse neu hochladen, weil jede Adresse einen eigenen Speicher hat.
